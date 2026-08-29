@@ -20,7 +20,8 @@ data/external/*
 *.7z
 *.gz
 *.rar
-!docs/**/*.csv
+# docs/ guarda material de referencia (dicionario oficial etc.) e e versionado
+!docs/**
 
 # ---- Relatorios gerados ----
 reports/figuras/*

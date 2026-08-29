@@ -6,8 +6,10 @@ registros de **CAT (Comunicação de Acidente de Trabalho)**.
 Trabalho do **PPGCD/UFPR** — Programa de Pós-Graduação em Ciência de Dados,
 Universidade Federal do Paraná.
 
-> **Status:** esqueleto do projeto. A pergunta de pesquisa, o recorte dos dados e o
-> escopo da análise ainda serão definidos a partir do material em `docs/enunciado.md`.
+> **Status:** esqueleto do projeto. A fonte já está definida — microdados de CAT dos
+> Dados Abertos da Previdência Social, com dicionário em [`docs/dados.md`](docs/dados.md).
+> A pergunta de pesquisa e o recorte da análise ainda serão definidos
+> (ver `docs/enunciado.md`).
 
 ## Estrutura do repositório
 
@@ -70,6 +72,17 @@ from acidentes_trabalho.dados import io
 
 df = io.ler_csv("cat_2023.csv")          # lê de data/raw/ com sep=";" e latin-1
 io.salvar_parquet(df, "cat.parquet")     # grava em data/processed/
+```
+
+O dicionário oficial da base está transcrito em código, com as datas (AAAAMMDD) já
+tratadas:
+
+```python
+from acidentes_trabalho.dados import dicionario as dic
+
+dic.colunas_de_data()                    # as 5 variáveis de data
+dic.como_dataframe()                     # o dicionário inteiro como DataFrame
+df["Data Acidente"] = dic.converter_datas(df["Data Acidente"])
 ```
 
 ## Reprodutibilidade
