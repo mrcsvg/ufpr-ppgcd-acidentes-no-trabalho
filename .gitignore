@@ -1,0 +1,82 @@
+# ---- Dados ----
+# Dados brutos e derivados nao entram no versionamento (ver docs/dados.md).
+data/raw/*
+data/interim/*
+data/processed/*
+data/external/*
+!data/**/.gitkeep
+
+# Arquivos grandes / formatos tabulares soltos na raiz
+*.csv
+*.tsv
+*.parquet
+*.feather
+*.xlsx
+*.xls
+*.dbf
+*.sav
+*.dta
+*.zip
+*.7z
+*.gz
+*.rar
+!docs/**/*.csv
+
+# ---- Relatorios gerados ----
+reports/figuras/*
+!reports/figuras/.gitkeep
+referencias/*
+!referencias/.gitkeep
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+.installed.cfg
+pip-wheel-metadata/
+
+# Ambientes virtuais
+.venv/
+venv/
+env/
+ENV/
+
+# Ferramentas
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.tox/
+.nox/
+
+# ---- Jupyter ----
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+profile_default/
+ipython_config.py
+
+# ---- Segredos e configuracao local ----
+.env
+.env.*
+!.env.example
+*.pem
+credentials.json
+token.json
+
+# ---- Sistema operacional / editores ----
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
