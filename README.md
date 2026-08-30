@@ -11,6 +11,18 @@ Universidade Federal do Paraná.
 > A pergunta de pesquisa e o recorte da análise ainda serão definidos
 > (ver `docs/enunciado.md`).
 
+## Notebook no Colab
+
+[![Abrir no Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mrcsvg/ufpr-ppgcd-acidentes-no-trabalho/blob/claude/novo-projeto-o7g3f2/notebooks/01_consolidacao_e_eda.ipynb)
+
+[`notebooks/01_consolidacao_e_eda.ipynb`](notebooks/01_consolidacao_e_eda.ipynb) percorre
+o caminho inteiro — dos 61 CSVs à base única — demonstrando **ao vivo** cada armadilha
+encontrada e como foi resolvida, e termina na análise exploratória. Roda em cerca de 5
+minutos no Colab, sem instalação local.
+
+Se o badge não abrir (a branch tem barra no nome), use no Colab
+**Arquivo → Abrir notebook → GitHub** e cole a URL do repositório.
+
 ## Entregáveis
 
 | Arquivo | O que é |
@@ -19,6 +31,7 @@ Universidade Federal do Paraná.
 | [`docs/qualidade-dos-dados.md`](docs/qualidade-dos-dados.md) | As armadilhas estruturais dos dados — **leia antes de analisar** |
 | `reports/ATIVIDADE_3_preenchida.docx` | Relatório da Atividade 3 (EDA no ciclo ERP), reproduzível com `make atividade3` |
 | `reports/figuras/*.png` | Figuras da análise, geradas por `make figuras` |
+| [`notebooks/01_consolidacao_e_eda.ipynb`](notebooks/01_consolidacao_e_eda.ipynb) | Notebook do Colab: consolidação explicada passo a passo + EDA |
 
 ## Estrutura do repositório
 

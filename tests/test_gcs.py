@@ -66,9 +66,53 @@ def test_reconhece_url_assinada():
 
 
 def test_baixar_sem_bucket_avisa_o_que_falta(monkeypatch):
-    monkeypatch.setattr(gcs, "BUCKET_PADRAO", "")
+    monkeypatch.delenv(gcs.VARIAVEL_BUCKET, raising=False)
     with pytest.raises(ValueError, match="BUCKET_CAT"):
         gcs.baixar("cat_2023.csv")
+
+
+def test_bucket_e_lido_do_ambiente_a_cada_chamada(monkeypatch):
+    """Em notebook a variavel costuma ser definida depois do import."""
+    monkeypatch.delenv(gcs.VARIAVEL_BUCKET, raising=False)
+    assert gcs.bucket_padrao() == ""
+
+    monkeypatch.setenv(gcs.VARIAVEL_BUCKET, "meu-bucket")
+
+    assert gcs.bucket_padrao() == "meu-bucket"
+
+
+def _capturar_bucket(monkeypatch):
+    """Substitui a listagem por um espiao que registra o bucket consultado."""
+    vistos: list[str] = []
+
+    def falhar(bucket, prefixo):
+        raise ImportError("sem google-cloud-storage")
+
+    def espiao(bucket, prefixo):
+        vistos.append(bucket)
+        return []
+
+    monkeypatch.setattr(gcs, "_listar_autenticado", falhar)
+    monkeypatch.setattr(gcs, "_listar_publico", espiao)
+    return vistos
+
+
+def test_bucket_explicito_tem_prioridade_sobre_o_ambiente(monkeypatch):
+    monkeypatch.setenv(gcs.VARIAVEL_BUCKET, "do-ambiente")
+    vistos = _capturar_bucket(monkeypatch)
+
+    gcs.listar("explicito")
+
+    assert vistos == ["explicito"]
+
+
+def test_sem_bucket_explicito_usa_o_do_ambiente(monkeypatch):
+    monkeypatch.setenv(gcs.VARIAVEL_BUCKET, "do-ambiente")
+    vistos = _capturar_bucket(monkeypatch)
+
+    gcs.listar()
+
+    assert vistos == ["do-ambiente"]
 
 
 class _HandlerSilencioso(http.server.SimpleHTTPRequestHandler):

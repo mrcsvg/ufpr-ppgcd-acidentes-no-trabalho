@@ -35,8 +35,18 @@ ESPERA_INICIAL = 2.0
 class DownloadIncompleto(OSError):
     """O corpo recebido e menor que o ``Content-Length`` anunciado."""
 
-# Bucket padrao do projeto; sobrescrito pela variavel de ambiente BUCKET_CAT.
-BUCKET_PADRAO = os.getenv("BUCKET_CAT", "")
+# Nome da variavel de ambiente que aponta o bucket do projeto.
+VARIAVEL_BUCKET = "BUCKET_CAT"
+
+
+def bucket_padrao() -> str:
+    """Le o bucket configurado em ``BUCKET_CAT``.
+
+    A leitura acontece a cada chamada, e nao na importacao do modulo: em notebook
+    e comum definir a variavel depois de importar, e um valor fixado na
+    importacao ignoraria isso em silencio.
+    """
+    return os.getenv(VARIAVEL_BUCKET, "")
 
 
 @dataclass(frozen=True)
@@ -176,7 +186,7 @@ def baixar(
     if "://" in uri:
         nome_bucket, objeto = parse_uri(uri)
     else:
-        nome_bucket = bucket or BUCKET_PADRAO
+        nome_bucket = bucket or bucket_padrao()
         objeto = uri.lstrip("/")
         if not nome_bucket:
             raise ValueError(
@@ -211,7 +221,7 @@ def listar(bucket: str | None = None, prefixo: str = "") -> list[Objeto]:
     Tenta a API autenticada e cai para a API publica de listagem quando nao ha
     credencial — que funciona enquanto o bucket estiver aberto para leitura.
     """
-    nome_bucket = bucket or BUCKET_PADRAO
+    nome_bucket = bucket or bucket_padrao()
     if not nome_bucket:
         raise ValueError("bucket nao informado: passe bucket=... ou defina BUCKET_CAT")
     try:
@@ -274,7 +284,7 @@ def sincronizar(
     """
     pasta = destino or DADOS_RAW
     pasta.mkdir(parents=True, exist_ok=True)
-    nome_bucket = bucket or BUCKET_PADRAO
+    nome_bucket = bucket or bucket_padrao()
 
     caminhos = []
     for objeto in listar(nome_bucket, prefixo):
