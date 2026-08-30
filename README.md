@@ -59,8 +59,16 @@ pytest
 
 ## Dados
 
-Os dados **não são versionados** neste repositório. Antes de rodar qualquer análise,
-baixe os arquivos para `data/raw/` seguindo as instruções em
+Os dados **não são versionados** neste repositório. Eles ficam em um bucket do
+Google Cloud Storage (projeto `ufpr-ppgcd`); copie `.env.example` para `.env`,
+preencha `BUCKET_CAT` e baixe:
+
+```bash
+python -m acidentes_trabalho.dados.gcs --listar        # o que há no bucket
+python -m acidentes_trabalho.dados.gcs cat_2023.csv    # baixa para data/raw/
+```
+
+As instruções completas, incluindo credenciais e URLs assinadas, estão em
 [`docs/dados.md`](docs/dados.md).
 
 Dentro do código, use sempre os caminhos de `acidentes_trabalho.config` em vez de

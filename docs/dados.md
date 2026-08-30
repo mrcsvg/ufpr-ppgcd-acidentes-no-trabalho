@@ -15,9 +15,43 @@ O dicionário oficial usado como referência está versionado em
 
 ## Como obter
 
-1. Baixe os arquivos originais para `data/raw/`.
-2. Não renomeie nem edite nada em `data/raw/` — essa camada é imutável.
-3. Registre abaixo, para cada arquivo, a origem, a data do download e o período coberto.
+Os arquivos do trabalho estão em um bucket do **Google Cloud Storage**, no projeto
+`ufpr-ppgcd`. Defina o bucket em `.env` (a partir de `.env.example`):
+
+```
+BUCKET_CAT=nome-do-bucket
+```
+
+E baixe para `data/raw/`:
+
+```bash
+# lista o que existe no bucket (exige credencial)
+python -m acidentes_trabalho.dados.gcs --listar
+
+# baixa um ou mais objetos
+python -m acidentes_trabalho.dados.gcs cat_2023.csv cat_2024.csv
+python -m acidentes_trabalho.dados.gcs gs://nome-do-bucket/cat/2023.csv
+```
+
+### Credenciais
+
+O download tenta primeiro o acesso autenticado e, se não houver credencial nem a
+biblioteca instalada, cai para HTTPS direto — que funciona com objeto público ou
+com URL assinada.
+
+| Situação | O que fazer |
+|---|---|
+| Você tem acesso ao projeto `ufpr-ppgcd` | `gcloud auth application-default login` e `pip install -e ".[gcs]"` |
+| Conta de serviço | Aponte `GOOGLE_APPLICATION_CREDENTIALS` para o JSON da chave |
+| Sem credencial | Use uma URL assinada (`gcloud storage sign-url`), que o download aceita direto |
+
+**Não versione chaves de conta de serviço.** O `.gitignore` já bloqueia
+`credentials.json`, `token.json`, `*.pem` e `.env`.
+
+Depois de baixar:
+
+1. Não renomeie nem edite nada em `data/raw/` — essa camada é imutável.
+2. Registre abaixo, para cada arquivo, a origem, a data do download e o período coberto.
 
 | Arquivo | Fonte | Data do download | Período | Observações |
 |---|---|---|---|---|
