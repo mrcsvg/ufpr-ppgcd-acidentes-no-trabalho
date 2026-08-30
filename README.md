@@ -82,16 +82,24 @@ df = io.ler_csv("cat_2023.csv")          # lê de data/raw/ com sep=";" e latin-
 io.salvar_parquet(df, "cat.parquet")     # grava em data/processed/
 ```
 
-O dicionário oficial da base está transcrito em código, com as datas (AAAAMMDD) já
-tratadas:
+> **Atenção:** os 61 arquivos do acervo **não compartilham um esquema único** —
+> são 5 cabeçalhos diferentes, e em parte deles os rótulos de coluna não
+> correspondem ao conteúdo. Nunca empilhe os CSVs por nome de coluna. Use
+> `dados.esquemas.ler`, que mapeia por posição:
 
 ```python
-from acidentes_trabalho.dados import dicionario as dic
+import pandas as pd
+from acidentes_trabalho.config import DADOS_RAW
+from acidentes_trabalho.dados import esquemas, limpeza
 
-dic.colunas_de_data()                    # as 5 variáveis de data
-dic.como_dataframe()                     # o dicionário inteiro como DataFrame
-df["Data Acidente"] = dic.converter_datas(df["Data Acidente"])
+df = pd.concat([esquemas.ler(c) for c in DADOS_RAW.glob("*.csv")], ignore_index=True)
+df = limpeza.limpar(df)
 ```
+
+As armadilhas dos dados — incluindo uma coluna corrompida na origem e um formato
+de data que contradiz o dicionário oficial — estão levantadas em
+[`docs/qualidade-dos-dados.md`](docs/qualidade-dos-dados.md). **Leia antes de
+analisar.**
 
 ## Reprodutibilidade
 

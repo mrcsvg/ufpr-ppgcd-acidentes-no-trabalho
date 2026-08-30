@@ -103,20 +103,27 @@ em vez de quebrar.
 | UF Município do Acidente | 28 | Unidade da Federação do local do acidente |
 | UF Município Empregador | 29 | Unidade da Federação do município do empregador |
 
-### Observações sobre o dicionário oficial
+### Onde o dicionário oficial diverge dos arquivos
 
-Pontos do arquivo original que valem atenção na hora de ler os dados:
+Verificado contra os dados reais. O relatório completo está em
+[`qualidade-dos-dados.md`](qualidade-dos-dados.md); o essencial:
 
-- **`Data Acidente` aparece duas vezes** na planilha (linhas 2 e 23), com a mesma
-  descrição — é duplicação do próprio arquivo, não duas variáveis distintas.
-- **`Sexo` tem 4 categorias**, não 2; e **`Indicador de Óbito Acidente` tem 2**.
-  Confirmar os domínios reais nos dados antes de recodificar.
-- **`UF Município do Acidente` (28) e `UF Município Empregador` (29)** têm mais
-  categorias do que as 27 UFs — provavelmente incluem código de ignorado/exterior.
+- **O formato de data está errado no dicionário.** Ele declara `AAAAMMDD`, e
+  nenhum arquivo usa isso: é `DD/MM/AAAA` para data exata e `AAAA/MM` para
+  competência. Converta com `dados.datas`, nunca com o formato publicado.
+- **`Data Acidente` aparece duas vezes porque são duas colunas do CSV** (posições
+  2 e 23), não porque o documento se repetiu. Em alguns arquivos a coluna 2 traz
+  competência, e em outros repete a data exata.
+- **`UF Município do Acidente` está corrompida na origem** e não é recuperável:
+  os rótulos estão trocados e 12 UFs não têm rótulo algum. Não use essa coluna.
+- **`Sexo` tem mesmo 4 categorias** — Feminino, Masculino, Não Informado e
+  Indeterminado, que não é sinônimo de Não Informado.
+- **`Tipo de Acidente` declara 4 categorias, mas só 3 aparecem**: Típico,
+  Trajeto e Doença.
 - **`CNAE` tem apenas 87 categorias**: é o agrupamento do AEPS (seção/divisão),
   não a CNAE completa a 5 dígitos.
-- Código e descrição vêm em colunas separadas (`CBO`/`CBO Descrição` etc.) e
-  declaram a mesma cardinalidade — dá para validar a consistência entre as duas.
+- **As descrições vêm truncadas em 20 caracteres** em `CID-10` e `CBO` (82,7% e
+  63,3% dos registros). Use os códigos e cruze com tabela externa.
 
 ## Camadas
 
@@ -131,12 +138,29 @@ O caminho de leitura e escrita de cada camada está em
 `acidentes_trabalho.dados.io` — use `io.ler_csv`, `io.ler_parquet` e
 `io.salvar_parquet` em vez de montar caminhos à mão.
 
-## Decisões de limpeza
+## Como ler
 
-Registre aqui toda decisão que altere o conjunto de linhas ou o significado de uma
-coluna — exclusão de registros, imputação, recodificação, deduplicação — com a
-justificativa e o commit em que foi implementada.
+`dados.esquemas.ler` unifica os cinco cabeçalhos diferentes do acervo em um
+formato único, mapeando **por posição** (os rótulos de coluna são inconfiáveis em
+parte dos arquivos). `dados.limpeza.limpar` aplica as decisões de limpeza por cima.
+
+```python
+import pandas as pd
+from acidentes_trabalho.config import DADOS_RAW
+from acidentes_trabalho.dados import esquemas, limpeza
+
+df = pd.concat([esquemas.ler(c) for c in DADOS_RAW.glob("*.csv")], ignore_index=True)
+df = limpeza.limpar(df)
+```
+
+## Decisões de limpeza
 
 | Decisão | Justificativa | Onde está implementada |
 |---|---|---|
-| _(a preencher)_ | | |
+| `{ñ class}` e `Zerado` viram nulo | São marcadores de ausência gravados como texto; sem isso entram nas contagens como categoria | `dados.limpeza.marcar_sentinelas` |
+| `uf_acidente` é descartada | Rótulos trocados e 12 UFs colapsadas em `{ñ class}` — irrecuperável | `dados.limpeza.descartar_colunas_nao_confiaveis` |
+| Colunas ausentes num leiaute saem nulas | Permite empilhar arquivos de leiautes diferentes sem inventar valor | `dados.esquemas.ler` |
+| Colunas com rótulo que não bate com o conteúdo são descartadas | Ex.: coluna 19 do `v24_sem_descricao`, rotulada `Data Acidente`, repete a competência | `dados.esquemas` (posições `None`) |
+
+Registre aqui toda decisão nova que altere o conjunto de linhas ou o significado
+de uma coluna, com a justificativa e onde foi implementada.

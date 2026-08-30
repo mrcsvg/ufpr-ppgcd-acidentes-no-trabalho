@@ -4,9 +4,18 @@ Transcricao do dicionario oficial publicado nos Dados Abertos da Previdencia
 Social (versao de 10/02/2021), disponivel em
 ``docs/dicionario_cat_dadosabertos_2021-02-10.xlsx``.
 
-O dicionario descreve as variaveis pelo rotulo usado na publicacao; o nome exato
-da coluna em cada arquivo pode variar entre as competencias, entao trate
-``VARIAVEIS`` como referencia de conteudo e tipo, nao como esquema rigido.
+O dicionario descreve as variaveis pelo rotulo usado na publicacao. **Ele nao
+descreve fielmente os arquivos**, e as divergencias verificadas no acervo estao
+registradas em ``docs/dados.md``. Duas importam ao ler os dados:
+
+- o dicionario declara as datas como ``AAAAMMDD``, mas nenhum arquivo usa esse
+  formato: e ``DD/MM/AAAA`` para data exata e ``AAAA/MM`` para competencia (a
+  conversao correta esta em ``acidentes_trabalho.dados.datas``);
+- ``Data Acidente`` aparece duas vezes porque sao **duas colunas distintas** do
+  CSV, nao uma duplicacao do documento.
+
+Trate ``VARIAVEIS`` como referencia de conteudo publicada, e ``dados.esquemas``
+como a descricao do que os arquivos realmente trazem.
 """
 
 from __future__ import annotations
@@ -14,9 +23,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import pandas as pd
-
-# Formato das colunas de data nos microdados de CAT.
-FORMATO_DATA = "%Y%m%d"
 
 
 @dataclass(frozen=True)
@@ -83,16 +89,6 @@ def colunas_categoricas() -> tuple[str, ...]:
     """Rotulos das variaveis categoricas."""
     return tuple(v.rotulo for v in VARIAVEIS if not v.e_data)
 
-
-def converter_datas(serie: pd.Series) -> pd.Series:
-    """Converte uma coluna AAAAMMDD (texto ou inteiro) em ``datetime``.
-
-    Valores invalidos ou ausentes viram ``NaT`` em vez de levantar excecao: os
-    microdados trazem datas em branco e sentinelas como ``0`` e ``99999999``.
-    """
-    texto = serie.astype("string").str.strip().str.replace(r"\.0$", "", regex=True)
-    texto = texto.where(texto.str.fullmatch(r"\d{8}"), other=pd.NA)
-    return pd.to_datetime(texto, format=FORMATO_DATA, errors="coerce")
 
 
 def como_dataframe() -> pd.DataFrame:

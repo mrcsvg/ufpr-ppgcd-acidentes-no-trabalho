@@ -1,7 +1,5 @@
 """Testes do dicionario de dados de CAT."""
 
-import pandas as pd
-
 from acidentes_trabalho.dados import dicionario as dic
 
 
@@ -33,21 +31,6 @@ def test_toda_categorica_declara_quantas_categorias_tem():
             assert variavel.categorias and variavel.categorias > 0, variavel.rotulo
 
 
-def test_converter_datas_aceita_texto_e_inteiro():
-    esperado = pd.Timestamp("2020-03-15")
-
-    assert dic.converter_datas(pd.Series(["20200315"]))[0] == esperado
-    assert dic.converter_datas(pd.Series([20200315]))[0] == esperado
-    assert dic.converter_datas(pd.Series([20200315.0]))[0] == esperado
-
-
-def test_converter_datas_transforma_valor_invalido_em_nat():
-    serie = pd.Series(["20200315", "", "0", "99999999", "20201332", None])
-
-    convertido = dic.converter_datas(serie)
-
-    assert convertido[0] == pd.Timestamp("2020-03-15")
-    assert convertido[1:].isna().all()
 
 
 def test_como_dataframe_espelha_as_variaveis():
