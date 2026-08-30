@@ -3,9 +3,10 @@
 Inspeção do acervo em `gs://acidentes-no-trabalho/cats/` — 61 CSVs, 1,92 GB,
 acidentes de 2018 a maio/2026.
 
-Os números abaixo vêm da leitura integral de **6 arquivos** (222.431 registros),
-um por esquema encontrado. As conclusões sobre estrutura valem para os 61, porque
-o cabeçalho de todos foi verificado; as proporções valem para a amostra.
+Os números vêm da base consolidada completa: **3.931.904 registros** dos 61
+arquivos. O perfil descritivo (preenchimento, domínios, distribuições) fica em
+[`../reports/relatorio-dados.md`](../reports/relatorio-dados.md), regerado pelo
+pipeline; aqui ficam as **armadilhas estruturais**, que não mudam a cada rodada.
 
 ## Resumo
 
@@ -23,43 +24,43 @@ o cabeçalho de todos foi verificado; as proporções valem para a amostra.
 
 O achado mais sério. A coluna é inutilizável, por dois motivos somados.
 
-**Os rótulos estão trocados**, de forma sistemática (94% a 99% de concentração):
+**Os rótulos estão trocados**, de forma sistemática. Cruzando com a UF derivada
+do código IBGE do município (que é confiável), cada rótulo aponta para uma única
+UF real, com 94% a 99% de concentração:
 
 | Rótulo gravado | UF real | Registros |
 |---|---|---:|
-| Maranhão | São Paulo | 76.437 |
-| Rondônia | Minas Gerais | 23.621 |
-| Roraima | Paraná | 18.343 |
-| Tocantins | Rio de Janeiro | 13.773 |
-| Pará | Pernambuco | 4.213 |
-| Acre | Pará | 3.612 |
-| Ceará | Distrito Federal | 2.938 |
-| Pernambuco | Rondônia | 1.404 |
-| Amazonas | Paraíba | 998 |
-| Piauí | Sergipe | 837 |
-| Amapá | Piauí | 645 |
-| Alagoas | Roraima | 264 |
-| Rio Grande Norte | Acre | 222 |
-| Paraíba | Amapá | 181 |
+| Maranhão | SP | 1.339.950 |
+| Rondônia | MG | 382.882 |
+| Roraima | PR | 305.683 |
+| Tocantins | RJ | 247.940 |
+| Pará | PE | 77.582 |
+| Acre | PA | 56.061 |
+| Ceará | DF | 53.875 |
+| Pernambuco | RO | 21.987 |
+| Amazonas | PB | 21.242 |
+| Piauí | SE | 14.188 |
+| Sergipe | TO | 13.122 |
+| Amapá | PI | 12.766 |
+| Alagoas | RR | 5.343 |
+| Rio Grande Norte | AC | 4.824 |
+| Paraíba | AP | 4.086 |
 
-**E 12 UFs não têm rótulo nenhum**: caem todas em `{ñ class}`, 32,1% dos registros.
-Verificado diretamente — entre os registros com `uf_acidente = {ñ class}`, o
-empregador está em:
+**E 12 UFs não têm rótulo nenhum.** Caem todas no sentinela `{ñ class}` — 32,9%
+dos registros (1.293.886). São elas:
 
 ```
-Rio Grande do Sul 18.917 | Santa Catarina 14.832 | Goiás 6.574 | Bahia 5.885
-Espírito Santo 5.213 | Mato Grosso 5.157 | Mato Grosso do Sul 3.819
-Ceará 3.755 | Amazonas 2.194 | Rio Grande do Norte 1.517 | Maranhão 1.322
-Alagoas 1.104
+AL · AM · BA · CE · ES · GO · MA · MS · MT · RN · RS · SC
 ```
 
-Ou seja: a coluna **não distingue esses 12 estados de forma alguma**. Nem
-recodificar resolve — a informação não está lá.
+Rio Grande do Sul e Santa Catarina, juntos, respondem por mais de 560 mil
+registros na base. A coluna **não distingue esses 12 estados de forma alguma** —
+nem recodificar resolve, porque a informação não está lá.
 
-**Consequência:** use `uf_empregador` e `municipio_empregador`, lembrando que
-localizam **o empregador, não o acidente**. Para 98% dos registros as duas UFs
-divergem, então a diferença importa. `dados.limpeza` descarta `uf_acidente` por
-padrão.
+**Consequência:** use `uf_empregador_sigla`, derivada do código IBGE do
+município, lembrando que localiza **o empregador, não o acidente**.
+`uf_acidente` fica na base consolidada apenas para que este diagnóstico possa ser
+conferido; `limpeza.descartar_colunas_nao_confiaveis` a remove na análise.
 
 ## 2. Cinco cabeçalhos, quatro leiautes — e rótulos que mentem
 
@@ -146,16 +147,26 @@ preenchimento — por isso a proporção depende de quais arquivos entram na an�
 
 ## 8. Domínios observados
 
-- `sexo`: Feminino, Masculino, Não Informado, **Indeterminado** — as 4 categorias
-  do dicionário; as duas últimas não são a mesma coisa.
-- `tipo_acidente`: Típico, Trajeto, Doença — 3 valores, e o dicionário declara 4.
-- `indica_obito`: Sim, Não.
-- `{ñ class}` aparece em 12 colunas: `cbo_descricao` (10,1%), `cid10_descricao`
-  (3,9%), `agente_causador` (3,7%), `cnae_descricao` (2,1%) e outras.
-- `Zerado` aparece em `uf_acidente` e `uf_empregador` (≈2.800 registros cada).
+- `sexo`: Feminino (34,9%), Masculino (64,7%), Não Informado, **Indeterminado** —
+  as 4 categorias do dicionário; as duas últimas não são a mesma coisa.
+- `tipo_acidente`: Típico (72,6%), Trajeto (22,0%), Doença (3,0%) e **Ignorado**
+  (2,3%) — as 4 do dicionário.
+- `indica_obito`: Não (97,2%), Sim (0,5%).
+- `especie_beneficio` traz 11 valores distintos, contra as 97 espécies declaradas
+  no dicionário.
 
-`dados.limpeza.marcar_sentinelas` converte os dois em nulo — sem isso eles entram
-nas contagens como se fossem categoria.
+### O sentinela também vem truncado
+
+`{ñ class}` (não classificado) é cortado pela largura fixa do campo, e aparece
+como `{ñ class}`, `{ñ class` e até `{ñ`, conforme a coluna. Uma limpeza que casse
+o texto inteiro deixa passar as versões cortadas — foi o que aconteceu na
+primeira versão deste projeto: 90.844 registros seguiram com `{ñ` em
+`indica_obito` e `{ñ class` em `origem_cadastramento`, contados como se fossem
+categoria válida.
+
+Como **nenhum valor legítimo da base começa com chave** (verificado nos 3.931.904
+registros), `limpeza` trata qualquer valor iniciado por `{` como ausência. Vale
+também para `Zerado`, que aparece nas colunas de UF.
 
 ## 9. Duplicatas
 

@@ -1,4 +1,4 @@
-.PHONY: setup test lint fmt notebook limpar
+.PHONY: setup dados relatorio test lint fmt notebook limpar
 
 VENV := .venv
 PY := $(VENV)/bin/python
@@ -7,6 +7,12 @@ setup:
 	python3 -m venv $(VENV)
 	$(PY) -m pip install --upgrade pip
 	$(PY) -m pip install -e ".[dev,notebooks]"
+
+dados:
+	$(PY) -m acidentes_trabalho.pipeline
+
+relatorio:
+	$(PY) -m acidentes_trabalho.pipeline relatorio
 
 test:
 	$(PY) -m pytest

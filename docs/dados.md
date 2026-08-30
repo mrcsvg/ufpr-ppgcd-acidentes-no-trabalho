@@ -140,18 +140,34 @@ O caminho de leitura e escrita de cada camada está em
 
 ## Como ler
 
-`dados.esquemas.ler` unifica os cinco cabeçalhos diferentes do acervo em um
-formato único, mapeando **por posição** (os rótulos de coluna são inconfiáveis em
-parte dos arquivos). `dados.limpeza.limpar` aplica as decisões de limpeza por cima.
+O caminho normal é rodar o pipeline uma vez e depois ler a base consolidada:
+
+```bash
+python -m acidentes_trabalho.pipeline
+```
 
 ```python
-import pandas as pd
-from acidentes_trabalho.config import DADOS_RAW
-from acidentes_trabalho.dados import esquemas, limpeza
+from acidentes_trabalho import pipeline
+from acidentes_trabalho.dados import limpeza
 
-df = pd.concat([esquemas.ler(c) for c in DADOS_RAW.glob("*.csv")], ignore_index=True)
-df = limpeza.limpar(df)
+df = pipeline.carregar(colunas=["data_acidente", "sexo", "uf_empregador_sigla"])
+df = limpeza.descartar_colunas_nao_confiaveis(df)
 ```
+
+Por baixo, `dados.esquemas.ler` unifica os cinco cabeçalhos do acervo mapeando
+**por posição** (os rótulos de coluna são inconfiáveis em parte dos arquivos),
+`dados.limpeza` aplica as decisões de limpeza e `dados.derivadas` acrescenta as
+variáveis calculadas.
+
+### Colunas derivadas
+
+| Coluna | Origem | Por quê |
+|---|---|---|
+| `codigo_municipio_empregador` | 6 primeiros dígitos de `municipio_empregador` | O nome vem truncado; o código não |
+| `nome_municipio_empregador` | resto de `municipio_empregador` | Pode vir truncado em 20 caracteres |
+| `uf_empregador_sigla` | 2 primeiros dígitos do código IBGE | UF confiável, sem depender do rótulo |
+| `ano_acidente`, `mes_acidente` | `data_acidente` | Agrupamento temporal correto |
+| `idade_acidente` | `data_acidente - data_nascimento` | Descarta o que cai fora de 14–100 anos |
 
 ## Decisões de limpeza
 
@@ -161,6 +177,8 @@ df = limpeza.limpar(df)
 | `uf_acidente` é descartada | Rótulos trocados e 12 UFs colapsadas em `{ñ class}` — irrecuperável | `dados.limpeza.descartar_colunas_nao_confiaveis` |
 | Colunas ausentes num leiaute saem nulas | Permite empilhar arquivos de leiautes diferentes sem inventar valor | `dados.esquemas.ler` |
 | Colunas com rótulo que não bate com o conteúdo são descartadas | Ex.: coluna 19 do `v24_sem_descricao`, rotulada `Data Acidente`, repete a competência | `dados.esquemas` (posições `None`) |
+| Idade fora de 14–100 anos vira nulo | Incompatível com vínculo formal; indica data de nascimento errada | `dados.derivadas.idade` |
+| `uf_acidente` é **mantida** na base consolidada | A base é o registro fiel do acervo; o descarte é decisão de análise | `pipeline.normalizar_um` |
 
 Registre aqui toda decisão nova que altere o conjunto de linhas ou o significado
 de uma coluna, com a justificativa e onde foi implementada.

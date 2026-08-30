@@ -117,3 +117,73 @@ def test_baixar_url_nao_deixa_arquivo_parcial_em_caso_de_erro(servidor, tmp_path
 
     assert not destino.exists()
     assert not list(destino.parent.glob("*.parcial"))
+
+
+class _HandlerInstavel(_HandlerSilencioso):
+    """Derruba a conexao nas primeiras ``falhas`` requisicoes."""
+
+    falhas = 0
+
+    def do_GET(self):
+        if type(self).falhas > 0:
+            type(self).falhas -= 1
+            # Resposta bem formada, mas com corpo menor que o Content-Length:
+            # e assim que uma transferencia cortada chega ao cliente.
+            self.send_response(200)
+            self.send_header("Content-Length", "999")
+            self.end_headers()
+            self.wfile.write(b"trunca")
+            self.close_connection = True
+            return
+        super().do_GET()
+
+
+@pytest.fixture
+def servidor_instavel(tmp_path, monkeypatch):
+    """Servidor que falha nas duas primeiras requisicoes e depois responde."""
+    monkeypatch.setenv("no_proxy", "127.0.0.1,localhost")
+    monkeypatch.setattr(urllib.request, "_opener", None)
+    monkeypatch.setattr(gcs, "ESPERA_INICIAL", 0.01)
+
+    _HandlerInstavel.falhas = 2
+    handler = functools.partial(_HandlerInstavel, directory=str(tmp_path))
+    httpd = http.server.HTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{httpd.server_port}", tmp_path
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        thread.join(timeout=5)
+
+
+def test_baixar_url_repete_apos_resposta_truncada(servidor_instavel, tmp_path):
+    base, raiz = servidor_instavel
+    (raiz / "cat.csv").write_text("uf;total\nPR;10\n", encoding="latin-1")
+    destino = tmp_path / "saida" / "cat.csv"
+
+    gcs.baixar_url(f"{base}/cat.csv", destino)
+
+    assert destino.read_text(encoding="latin-1") == "uf;total\nPR;10\n"
+    assert _HandlerInstavel.falhas == 0, "as duas falhas deveriam ter sido consumidas"
+
+
+def test_baixar_url_desiste_apos_o_limite_de_tentativas(servidor_instavel, tmp_path):
+    base, raiz = servidor_instavel
+    _HandlerInstavel.falhas = 99
+    (raiz / "cat.csv").write_text("x", encoding="latin-1")
+    destino = tmp_path / "saida" / "cat.csv"
+
+    with pytest.raises(gcs.DownloadIncompleto):
+        gcs.baixar_url(f"{base}/cat.csv", destino, tentativas=2)
+
+    assert not destino.exists()
+
+
+def test_baixar_url_nao_repete_em_erro_http(servidor_instavel, tmp_path):
+    base, _ = servidor_instavel
+    _HandlerInstavel.falhas = 0
+
+    with pytest.raises(urllib.error.HTTPError):
+        gcs.baixar_url(f"{base}/nao-existe.csv", tmp_path / "x.csv")

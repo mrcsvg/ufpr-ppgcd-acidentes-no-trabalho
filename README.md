@@ -43,10 +43,36 @@ Requer Python 3.11 ou superior.
 
 ```bash
 make setup     # cria .venv e instala o pacote em modo editável
+make dados     # roda o pipeline completo: baixa, normaliza, consolida, relata
 make test      # roda os testes
 make lint      # roda o ruff
 make notebook  # abre o JupyterLab
 ```
+
+## O pipeline
+
+Quatro etapas, cada uma retomável de forma independente:
+
+```
+baixar      bucket GCS             ->  data/raw/*.csv          61 arquivos, 1,8 GB
+normalizar  data/raw/*.csv         ->  data/interim/*.parquet  unifica 5 esquemas
+consolidar  data/interim/*.parquet ->  data/processed/cat.parquet
+relatorio   data/processed         ->  reports/relatorio-dados.md
+```
+
+```bash
+python -m acidentes_trabalho.pipeline              # tudo (~2 min)
+python -m acidentes_trabalho.pipeline normalizar   # só uma etapa
+python -m acidentes_trabalho.pipeline --refazer    # ignora o que já está pronto
+```
+
+A base consolidada tem **3.931.904 registros** de acidentes entre 2019 e 2026,
+em 94 MB de Parquet (contra 1,8 GB de CSV). A consolidação grava em fluxo, um
+arquivo por vez, então roda em máquina modesta.
+
+> `--refazer` é necessário depois de alterar `esquemas`, `limpeza` ou
+> `derivadas`: o pipeline compara datas de arquivo, e mudança de código não
+> invalida os intermediários sozinha.
 
 Sem o `make`:
 
@@ -88,12 +114,12 @@ io.salvar_parquet(df, "cat.parquet")     # grava em data/processed/
 > `dados.esquemas.ler`, que mapeia por posição:
 
 ```python
-import pandas as pd
-from acidentes_trabalho.config import DADOS_RAW
-from acidentes_trabalho.dados import esquemas, limpeza
+from acidentes_trabalho import pipeline
+from acidentes_trabalho.dados import limpeza
 
-df = pd.concat([esquemas.ler(c) for c in DADOS_RAW.glob("*.csv")], ignore_index=True)
-df = limpeza.limpar(df)
+df = pipeline.carregar()                        # base inteira
+df = pipeline.carregar(colunas=["sexo", "ano_acidente", "uf_empregador_sigla"])
+df = limpeza.descartar_colunas_nao_confiaveis(df)   # remove uf_acidente
 ```
 
 As armadilhas dos dados — incluindo uma coluna corrompida na origem e um formato

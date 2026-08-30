@@ -13,18 +13,38 @@ passado explicitamente em cada chamada.
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
+from dataclasses import dataclass
 from pathlib import Path
 
 from acidentes_trabalho.config import DADOS_RAW
 
 HOST_GCS = "storage.googleapis.com"
 
+# Transferencias longas caem; repetir com espera crescente resolve na pratica.
+TENTATIVAS = 5
+ESPERA_INICIAL = 2.0
+
+
+class DownloadIncompleto(OSError):
+    """O corpo recebido e menor que o ``Content-Length`` anunciado."""
+
 # Bucket padrao do projeto; sobrescrito pela variavel de ambiente BUCKET_CAT.
 BUCKET_PADRAO = os.getenv("BUCKET_CAT", "")
+
+
+@dataclass(frozen=True)
+class Objeto:
+    """Um objeto do bucket: nome completo e tamanho em bytes."""
+
+    nome: str
+    tamanho: int
 
 
 def parse_uri(uri: str) -> tuple[str, str]:
@@ -77,14 +97,52 @@ def _e_url_assinada(uri: str) -> bool:
     return "Signature=" in query or "X-Goog-Signature=" in query
 
 
-def baixar_url(url: str, destino: Path) -> Path:
-    """Baixa ``url`` para ``destino``, em streaming, e devolve o caminho gravado."""
+def baixar_url(url: str, destino: Path, *, tentativas: int = TENTATIVAS) -> Path:
+    """Baixa ``url`` para ``destino``, em streaming, e devolve o caminho gravado.
+
+    Transferencias longas sao cortadas de vez em quando ("connection reset by
+    peer"), sobretudo atraves de proxy. Cada tentativa recomeca o arquivo, com
+    espera crescente entre elas; a gravacao vai para um ``.parcial`` que so vira
+    o arquivo final quando o download termina, entao uma falha nunca deixa
+    arquivo truncado no lugar do bom.
+
+    Nem toda queda vira excecao: uma resposta cortada no meio simplesmente
+    termina antes da hora, e a copia em streaming a aceita em silencio. Por isso
+    o total gravado e conferido contra o ``Content-Length`` anunciado, e a
+    divergencia conta como falha - senao o arquivo truncado passaria por bom.
+
+    Raises:
+        DownloadIncompleto: se o corpo recebido for menor que o anunciado em
+            todas as tentativas.
+        HTTPError: imediatamente, sem repetir, quando o servidor recusa (4xx).
+    """
     destino.parent.mkdir(parents=True, exist_ok=True)
     parcial = destino.with_suffix(destino.suffix + ".parcial")
     try:
-        with urllib.request.urlopen(url) as resposta, parcial.open("wb") as saida:
-            shutil.copyfileobj(resposta, saida)
-        parcial.replace(destino)
+        for tentativa in range(1, tentativas + 1):
+            try:
+                with urllib.request.urlopen(url) as resposta, parcial.open("wb") as saida:
+                    shutil.copyfileobj(resposta, saida)
+                    anunciado = resposta.headers.get("Content-Length")
+                gravado = parcial.stat().st_size
+                if anunciado is not None and gravado != int(anunciado):
+                    raise DownloadIncompleto(
+                        f"{destino.name}: recebidos {gravado} bytes de {anunciado}"
+                    )
+                parcial.replace(destino)
+                return destino
+            except urllib.error.HTTPError:
+                raise  # 404, 403: repetir nao ajuda
+            except (
+                DownloadIncompleto,
+                urllib.error.URLError,
+                TimeoutError,
+                ConnectionError,
+                OSError,
+            ):
+                if tentativa == tentativas:
+                    raise
+                time.sleep(ESPERA_INICIAL * 2 ** (tentativa - 1))
     finally:
         parcial.unlink(missing_ok=True)
     return destino
@@ -147,15 +205,85 @@ def _baixar_autenticado(bucket: str, objeto: str, destino: Path) -> Path:
     return destino
 
 
-def listar(bucket: str | None = None, prefixo: str = "") -> list[str]:
-    """Lista os objetos de ``bucket`` sob ``prefixo``. Exige credenciais."""
-    from google.cloud import storage  # extra opcional: pip install -e ".[gcs]"
+def listar(bucket: str | None = None, prefixo: str = "") -> list[Objeto]:
+    """Lista os objetos de ``bucket`` sob ``prefixo``.
 
+    Tenta a API autenticada e cai para a API publica de listagem quando nao ha
+    credencial — que funciona enquanto o bucket estiver aberto para leitura.
+    """
     nome_bucket = bucket or BUCKET_PADRAO
     if not nome_bucket:
         raise ValueError("bucket nao informado: passe bucket=... ou defina BUCKET_CAT")
+    try:
+        return _listar_autenticado(nome_bucket, prefixo)
+    except ImportError:
+        return _listar_publico(nome_bucket, prefixo)
+
+
+def _listar_autenticado(bucket: str, prefixo: str) -> list[Objeto]:
+    from google.cloud import storage  # extra opcional: pip install -e ".[gcs]"
+
     cliente = storage.Client()
-    return [blob.name for blob in cliente.list_blobs(nome_bucket, prefix=prefixo)]
+    return [
+        Objeto(blob.name, blob.size or 0)
+        for blob in cliente.list_blobs(bucket, prefix=prefixo)
+        if not blob.name.endswith("/")
+    ]
+
+
+def _listar_publico(bucket: str, prefixo: str) -> list[Objeto]:
+    """Lista pela API JSON publica, paginando ate o fim."""
+    objetos: list[Objeto] = []
+    token = None
+    while True:
+        parametros = {"maxResults": "1000", "fields": "items(name,size),nextPageToken"}
+        if prefixo:
+            parametros["prefix"] = prefixo
+        if token:
+            parametros["pageToken"] = token
+        url = (
+            f"https://www.googleapis.com/storage/v1/b/{urllib.parse.quote(bucket)}/o"
+            f"?{urllib.parse.urlencode(parametros)}"
+        )
+        with urllib.request.urlopen(url) as resposta:
+            pagina = json.load(resposta)
+        objetos += [
+            Objeto(item["name"], int(item.get("size", 0)))
+            for item in pagina.get("items", [])
+            if not item["name"].endswith("/")
+        ]
+        token = pagina.get("nextPageToken")
+        if not token:
+            return objetos
+
+
+def sincronizar(
+    bucket: str | None = None,
+    prefixo: str = "",
+    destino: Path | None = None,
+    *,
+    refazer: bool = False,
+) -> list[Path]:
+    """Baixa para ``destino`` todos os objetos do bucket que ainda faltam.
+
+    Um objeto e considerado ja baixado quando existe um arquivo local de mesmo
+    nome e mesmo tamanho; ``refazer=True`` ignora essa verificacao.
+
+    Returns:
+        Os caminhos de todos os objetos, baixados agora ou ja presentes.
+    """
+    pasta = destino or DADOS_RAW
+    pasta.mkdir(parents=True, exist_ok=True)
+    nome_bucket = bucket or BUCKET_PADRAO
+
+    caminhos = []
+    for objeto in listar(nome_bucket, prefixo):
+        alvo = pasta / Path(objeto.nome).name
+        atual = alvo.stat().st_size if alvo.exists() else -1
+        if refazer or atual != objeto.tamanho:
+            baixar(objeto.nome, alvo, bucket=nome_bucket)
+        caminhos.append(alvo)
+    return caminhos
 
 
 def _main(argv: list[str] | None = None) -> int:
@@ -170,15 +298,25 @@ def _main(argv: list[str] | None = None) -> int:
     parser.add_argument("--bucket", default=None, help="bucket (padrao: variavel BUCKET_CAT)")
     parser.add_argument("--prefixo", default="", help="lista os objetos sob este prefixo")
     parser.add_argument("--listar", action="store_true", help="apenas lista, nao baixa")
+    parser.add_argument(
+        "--sincronizar", action="store_true", help="baixa tudo que falta sob --prefixo"
+    )
     args = parser.parse_args(argv)
 
     if args.listar:
-        for nome in listar(args.bucket, args.prefixo):
-            print(nome)
+        objetos = listar(args.bucket, args.prefixo)
+        for objeto in objetos:
+            print(f"{objeto.tamanho/1e6:9.1f} MB  {objeto.nome}")
+        print(f"{len(objetos)} objetos, {sum(o.tamanho for o in objetos)/1e9:.2f} GB")
+        return 0
+
+    if args.sincronizar:
+        caminhos = sincronizar(args.bucket, args.prefixo)
+        print(f"{len(caminhos)} arquivos em {caminhos[0].parent}" if caminhos else "nada a baixar")
         return 0
 
     if not args.uris:
-        parser.error("informe ao menos uma URI, ou use --listar")
+        parser.error("informe ao menos uma URI, ou use --listar / --sincronizar")
 
     for uri in args.uris:
         destino = baixar(uri, bucket=args.bucket)

@@ -281,7 +281,8 @@ def ler(caminho: Path | str, nrows: int | None = None) -> pd.DataFrame:
 
     for coluna in COLUNAS_CANONICAS:
         if coluna not in df.columns:
-            df[coluna] = pd.NA
+            # dtype explicito: sem ele a coluna vazia vira object e contamina o Parquet
+            df[coluna] = pd.Series(pd.NA, index=df.index, dtype="string")
 
     # A posicao 2 traz competencia em alguns leiautes e uma repeticao da data do
     # acidente em outros; so vale como competencia no primeiro caso.
