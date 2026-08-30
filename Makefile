@@ -1,4 +1,4 @@
-.PHONY: setup dados relatorio test lint fmt notebook limpar
+.PHONY: setup dados relatorio figuras atividade3 test lint fmt notebook limpar
 
 VENV := .venv
 PY := $(VENV)/bin/python
@@ -13,6 +13,13 @@ dados:
 
 relatorio:
 	$(PY) -m acidentes_trabalho.pipeline relatorio
+
+figuras:
+	$(PY) -m acidentes_trabalho.figuras
+
+atividade3: figuras
+	$(PY) -m pip install -q python-docx
+	$(PY) reports/atividade3/preencher.py
 
 test:
 	$(PY) -m pytest

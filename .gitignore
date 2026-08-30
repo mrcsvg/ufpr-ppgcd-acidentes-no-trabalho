@@ -24,8 +24,8 @@ data/external/*
 !docs/**
 
 # ---- Relatorios gerados ----
-reports/figuras/*
-!reports/figuras/.gitkeep
+# As figuras SAO versionadas: o relatorio da Atividade 3 as referencia, e o
+# revisor precisa ve-las sem ter que rodar o pipeline.
 referencias/*
 !referencias/.gitkeep
 

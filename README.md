@@ -11,6 +11,15 @@ Universidade Federal do Paraná.
 > A pergunta de pesquisa e o recorte da análise ainda serão definidos
 > (ver `docs/enunciado.md`).
 
+## Entregáveis
+
+| Arquivo | O que é |
+|---|---|
+| [`reports/relatorio-dados.md`](reports/relatorio-dados.md) | Perfil descritivo da base, regerado pelo pipeline |
+| [`docs/qualidade-dos-dados.md`](docs/qualidade-dos-dados.md) | As armadilhas estruturais dos dados — **leia antes de analisar** |
+| `reports/ATIVIDADE_3_preenchida.docx` | Relatório da Atividade 3 (EDA no ciclo ERP), reproduzível com `make atividade3` |
+| `reports/figuras/*.png` | Figuras da análise, geradas por `make figuras` |
+
 ## Estrutura do repositório
 
 ```
@@ -23,7 +32,9 @@ Universidade Federal do Paraná.
 ├── docs/                     # enunciado, dicionário de dados, decisões
 ├── notebooks/                # exploração — numerados na ordem de execução
 ├── referencias/              # artigos e material de apoio (não versionado)
-├── reports/figuras/          # figuras geradas (não versionadas)
+├── reports/                  # entregáveis
+│   ├── atividade3/           # template e gerador do relatório da disciplina
+│   └── figuras/              # figuras da análise (make figuras)
 ├── src/acidentes_trabalho/   # código reaproveitável
 │   ├── config.py             # caminhos e semente do projeto
 │   ├── dados/                # leitura, escrita e limpeza
@@ -44,6 +55,7 @@ Requer Python 3.11 ou superior.
 ```bash
 make setup     # cria .venv e instala o pacote em modo editável
 make dados     # roda o pipeline completo: baixa, normaliza, consolida, relata
+make figuras   # gera as figuras da análise em reports/figuras/
 make test      # roda os testes
 make lint      # roda o ruff
 make notebook  # abre o JupyterLab

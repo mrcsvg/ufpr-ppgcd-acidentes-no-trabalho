@@ -66,6 +66,7 @@ def _coluna_pct(serie: pd.Series, total: float, casas: int = 1) -> list[str]:
 def _secao_volume(df: pd.DataFrame, unico: pd.DataFrame) -> str:
     datas = unico["data_acidente"].dropna()
     duplicadas = len(df) - len(unico)
+    sem_data = int(unico["data_acidente"].isna().sum())
     por_leiaute = (
         df.groupby("leiaute", observed=True)
         .agg(arquivos=("arquivo", "nunique"), registros=("arquivo", "size"))
@@ -83,7 +84,8 @@ def _secao_volume(df: pd.DataFrame, unico: pd.DataFrame) -> str:
 | republicações (coluna `duplicata`) | {num(duplicadas)} ({pct(duplicadas, len(df))}) |
 | **registros únicos** | **{num(len(unico))}** |
 
-Acidentes de **{datas.min():%m/%Y} a {datas.max():%m/%Y}**. Sem data de acidente: {num(unico["data_acidente"].isna().sum())} registros ({pct(unico["data_acidente"].isna().sum(), len(unico), 2)}).
+Acidentes de **{datas.min():%m/%Y} a {datas.max():%m/%Y}**. Sem data de acidente:
+{num(sem_data)} registros ({pct(sem_data, len(unico), 2)}).
 
 > As seções seguintes usam os **registros únicos**, salvo onde indicado — contar
 > as linhas cruas superestima em {pct(duplicadas, len(df))}.
@@ -101,6 +103,7 @@ def _secao_republicacao(df: pd.DataFrame) -> str:
     tabela = integrais.reset_index()[["arquivo", "size"]].copy()
     tabela["size"] = _coluna_num(tabela["size"])
     tabela.columns = ["arquivo integralmente republicado", "linhas"]
+    repetidas = int(df["duplicata"].sum())
 
     return f"""## 2. Republicação entre arquivos
 
@@ -109,11 +112,16 @@ Os arquivos do acervo **não são partições disjuntas**: cada um cobre uma jan
 exemplo, cobre emissões de julho a novembro de 2022, e a `202208` cobre agosto a
 novembro — inteiramente contida na anterior.
 
-Resultado: empilhar os arquivos conta o mesmo acidente mais de uma vez. {num(int(df["duplicata"].sum()))} linhas ({pct(df["duplicata"].sum(), len(df))}) já haviam aparecido em um arquivo anterior, e **{len(integrais)} arquivos são republicação integral** — não trazem um único registro novo:
+Resultado: empilhar os arquivos conta o mesmo acidente mais de uma vez.
+{num(repetidas)} linhas ({pct(repetidas, len(df))}) já haviam aparecido em um
+arquivo anterior, e **{len(integrais)} arquivos são republicação integral** — não
+trazem um único registro novo:
 
 {_tabela(tabela, {"linhas": "d"})}
 
-Outros {len(parciais)} arquivos têm sobreposição parcial. A coluna `duplicata` marca a linha repetida sem apagá-la; use `pipeline.carregar(unicos=True)` para contar acidentes.
+Outros {len(parciais)} arquivos têm sobreposição parcial. A coluna `duplicata`
+marca a linha repetida sem apagá-la; use `pipeline.carregar(unicos=True)` para
+contar acidentes.
 
 A comparação é por conteúdo integral da linha. Como os registros **não têm
 identificador**, duas CATs realmente distintas mas idênticas em todos os campos
