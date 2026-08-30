@@ -1,16 +1,22 @@
 # Relatório da base consolidada de CAT
 
-Gerado em 30/08/2026 14:08 UTC a partir de `data/processed/cat.parquet`.
+Gerado em 30/08/2026 14:15 UTC a partir de `data/processed/cat.parquet`.
 
 Documento **descritivo**: mostra o que a base tem e onde ela falha, para
 orientar o recorte da análise. Não responde à pergunta de pesquisa.
 
 ## 1. Volume e cobertura
 
-- **3.931.904 registros** consolidados de **61 arquivos**.
-- Acidentes de **01/2019 a 06/2026**.
-- 8 registros sem data de acidente
-  (0,00%).
+| | registros |
+|:---|---:|
+| linhas nos 61 arquivos | 3.931.904 |
+| republicações (coluna `duplicata`) | 458.155 (11,7%) |
+| **registros únicos** | **3.473.749** |
+
+Acidentes de **01/2019 a 06/2026**. Sem data de acidente: 8 registros (0,00%).
+
+> As seções seguintes usam os **registros únicos**, salvo onde indicado — contar
+> as linhas cruas superestima em 11,7%.
 
 | leiaute | arquivos | registros |
 |:---|---:|---:|
@@ -19,23 +25,50 @@ orientar o recorte da análise. Não responde à pergunta de pesquisa.
 | v25_antigo | 8 | 865.999 |
 | v24_truncado | 5 | 283.197 |
 
-## 2. Registros por ano do acidente
+## 2. Republicação entre arquivos
+
+Os arquivos do acervo **não são partições disjuntas**: cada um cobre uma janela de
+*mês de emissão* da CAT, e as janelas se sobrepõem. A competência `202207`, por
+exemplo, cobre emissões de julho a novembro de 2022, e a `202208` cobre agosto a
+novembro — inteiramente contida na anterior.
+
+Resultado: empilhar os arquivos conta o mesmo acidente mais de uma vez. 458.155 linhas (11,7%) já haviam aparecido em um arquivo anterior, e **8 arquivos são republicação integral** — não trazem um único registro novo:
+
+| arquivo integralmente republicado | linhas |
+|:---|---:|
+| D.SDA.PDA.005.CAT.202208.csv | 123.442 |
+| D.SDA.PDA.005.CAT.202204.csv | 89.602 |
+| D.SDA.PDA.005.CAT.202508.csv | 72.885 |
+| D.SDA.PDA.005.CAT.202209.csv | 70.245 |
+| D.SDA.PDA.005.CAT.202405.csv | 57.990 |
+| D.SDA.PDA.005.CAT.202210.csv | 26.023 |
+| D.SDA.PDA.005.CAT.202211.csv | 5.112 |
+| D.SDA.PDA.005.CAT.202511.csv | 205 |
+
+Outros 34 arquivos têm sobreposição parcial. A coluna `duplicata` marca a linha repetida sem apagá-la; use `pipeline.carregar(unicos=True)` para contar acidentes.
+
+A comparação é por conteúdo integral da linha. Como os registros **não têm
+identificador**, duas CATs realmente distintas mas idênticas em todos os campos
+(mesmo dia, município, CBO, CID, sexo, data de nascimento e CNPJ) seriam
+contadas como uma só — risco baixo, mas real.
+
+## 3. Registros por ano do acidente
 
 Agrupado pela **data do acidente**, nao pela competencia do arquivo — as duas
 divergem, e os arquivos misturam anos.
 
 | ano do acidente | registros | % do total |
 |:---|---:|---:|
-| 2019 | 474.633 | 12,1% |
-| 2020 | 391.359 | 10,0% |
-| 2021 | 436.201 | 11,1% |
-| 2022 | 665.369 | 16,9% |
-| 2023 | 603.825 | 15,4% |
-| 2024 | 509.971 | 13,0% |
-| 2025 | 579.723 | 14,7% |
-| 2026 | 270.815 | 6,9% |
+| 2019 | 474.414 | 13,7% |
+| 2020 | 391.013 | 11,3% |
+| 2021 | 435.980 | 12,6% |
+| 2022 | 339.775 | 9,8% |
+| 2023 | 603.743 | 17,4% |
+| 2024 | 451.981 | 13,0% |
+| 2025 | 506.280 | 14,6% |
+| 2026 | 270.555 | 7,8% |
 
-## 3. Preenchimento e cardinalidade
+## 4. Preenchimento e cardinalidade
 
 Parte dos nulos e **estrutural**: a coluna nao existe em alguns leiautes, entao
 todo registro vindo daqueles arquivos fica nulo. Ver secao 1 para o peso de cada
@@ -43,32 +76,32 @@ leiaute.
 
 | coluna | % nulos | nulos | distintos |
 |:---|---:|---:|---:|
-| data_despacho_beneficio | 100,0% | 3.931.856 | 39 |
-| data_afastamento | 79,6% | 3.130.116 | 1.580 |
-| tipo_empregador | 63,0% | 2.477.487 | 4 |
-| competencia | 52,1% | 2.049.838 | 45 |
-| cbo_descricao | 41,1% | 1.614.859 | 2.197 |
-| cid10_descricao | 37,1% | 1.460.541 | 7.639 |
-| uf_acidente | 32,9% | 1.293.886 | 15 |
-| cnpj_cei_empregador | 29,2% | 1.149.196 | 536.585 |
-| data_emissao_cat | 9,5% | 374.041 | 2.355 |
-| agente_causador | 5,0% | 196.783 | 526 |
-| uf_empregador_sigla | 4,5% | 177.453 | 27 |
-| cnae_descricao | 4,5% | 175.832 | 978 |
-| uf_empregador | 4,5% | 175.532 | 27 |
-| cbo_codigo | 3,3% | 129.930 | 6.101 |
-| origem_cadastramento | 3,1% | 122.143 | 2 |
-| emitente_cat | 2,6% | 102.339 | 5 |
-| filiacao_segurado | 2,5% | 97.825 | 3 |
-| natureza_lesao | 2,4% | 94.688 | 49 |
-| parte_corpo_atingida | 2,4% | 92.491 | 74 |
-| indica_obito | 2,3% | 90.845 | 2 |
-| cid10_codigo | 1,6% | 63.750 | 16.699 |
-| idade_acidente | 0,2% | 5.982 | 84 |
-| data_nascimento | 0,2% | 5.951 | 23.625 |
-| municipio_empregador | 0,0% | 696 | 6.544 |
-| nome_municipio_empregador | 0,0% | 696 | 6.142 |
-| codigo_municipio_empregador | 0,0% | 696 | 5.145 |
+| data_despacho_beneficio | 100,0% | 3.473.705 | 39 |
+| data_afastamento | 79,1% | 2.747.140 | 1.580 |
+| tipo_empregador | 61,9% | 2.150.806 | 4 |
+| competencia | 55,2% | 1.917.782 | 45 |
+| cbo_descricao | 36,6% | 1.272.635 | 2.197 |
+| cnpj_cei_empregador | 33,1% | 1.148.565 | 536.585 |
+| uf_acidente | 32,8% | 1.139.065 | 15 |
+| cid10_descricao | 32,6% | 1.131.746 | 7.639 |
+| data_emissao_cat | 9,3% | 323.080 | 2.355 |
+| agente_causador | 3,8% | 131.874 | 526 |
+| cnae_descricao | 3,2% | 112.215 | 978 |
+| uf_empregador_sigla | 3,2% | 110.788 | 27 |
+| uf_empregador | 3,1% | 109.017 | 27 |
+| cbo_codigo | 2,9% | 100.864 | 6.101 |
+| origem_cadastramento | 1,9% | 67.687 | 2 |
+| cid10_codigo | 1,5% | 50.966 | 16.699 |
+| emitente_cat | 1,4% | 48.694 | 5 |
+| filiacao_segurado | 1,3% | 45.282 | 3 |
+| natureza_lesao | 1,3% | 43.791 | 49 |
+| parte_corpo_atingida | 1,2% | 41.596 | 74 |
+| indica_obito | 1,2% | 39.950 | 2 |
+| idade_acidente | 0,2% | 5.740 | 84 |
+| data_nascimento | 0,2% | 5.709 | 23.625 |
+| municipio_empregador | 0,0% | 647 | 6.544 |
+| nome_municipio_empregador | 0,0% | 647 | 6.142 |
+| codigo_municipio_empregador | 0,0% | 647 | 5.145 |
 | data_acidente | 0,0% | 8 | 2.671 |
 | ano_acidente | 0,0% | 8 | 8 |
 | mes_acidente | 0,0% | 8 | 12 |
@@ -76,75 +109,75 @@ leiaute.
 | especie_beneficio | 0,0% | 0 | 11 |
 | tipo_acidente | 0,0% | 0 | 4 |
 | sexo | 0,0% | 0 | 4 |
-| arquivo | 0,0% | 0 | 61 |
+| arquivo | 0,0% | 0 | 53 |
 | leiaute | 0,0% | 0 | 4 |
 
-## 4. Dominios das variaveis categoricas
+## 5. Dominios das variaveis categoricas
 
 ### `sexo`
 
 | valor | registros | % |
 |:---|---:|---:|
-| Masculino | 2.544.717 | 64,7% |
-| Feminino | 1.373.364 | 34,9% |
-| Não Informado | 13.088 | 0,3% |
-| Indeterminado | 735 | 0,0% |
+| Masculino | 2.248.468 | 64,7% |
+| Feminino | 1.212.743 | 34,9% |
+| Não Informado | 11.806 | 0,3% |
+| Indeterminado | 732 | 0,0% |
 
 ### `tipo_acidente`
 
 | valor | registros | % |
 |:---|---:|---:|
-| Típico | 2.856.117 | 72,6% |
-| Trajeto | 866.607 | 22,0% |
-| Doença | 118.614 | 3,0% |
-| Ignorado | 90.566 | 2,3% |
+| Típico | 2.558.827 | 73,7% |
+| Trajeto | 768.792 | 22,1% |
+| Doença | 106.296 | 3,1% |
+| Ignorado | 39.834 | 1,1% |
 
 ### `indica_obito`
 
 | valor | registros | % |
 |:---|---:|---:|
-| Não | 3.823.345 | 97,2% |
-| (nulo) | 90.845 | 2,3% |
-| Sim | 17.714 | 0,5% |
+| Não | 3.418.153 | 98,4% |
+| (nulo) | 39.950 | 1,2% |
+| Sim | 15.646 | 0,5% |
 
 ### `filiacao_segurado`
 
 | valor | registros | % |
 |:---|---:|---:|
-| Empregado | 3.823.536 | 97,2% |
-| (nulo) | 97.825 | 2,5% |
-| Trabalhador Avulso | 8.903 | 0,2% |
-| Segurado Especial | 1.640 | 0,0% |
+| Empregado | 3.419.264 | 98,4% |
+| (nulo) | 45.282 | 1,3% |
+| Trabalhador Avulso | 7.750 | 0,2% |
+| Segurado Especial | 1.453 | 0,0% |
 
 ### `emitente_cat`
 
 | valor | registros | % |
 |:---|---:|---:|
-| Empregador | 3.713.309 | 94,4% |
-| (nulo) | 102.339 | 2,6% |
-| Segurado/Dependente | 64.116 | 1,6% |
-| Sindicato | 32.120 | 0,8% |
-| Médico | 10.865 | 0,3% |
-| Autoridade Pública | 9.155 | 0,2% |
+| Empregador | 3.328.762 | 95,8% |
+| Segurado/Dependente | 52.623 | 1,5% |
+| (nulo) | 48.694 | 1,4% |
+| Sindicato | 27.702 | 0,8% |
+| Médico | 8.959 | 0,3% |
+| Autoridade Pública | 7.009 | 0,2% |
 
 ### `origem_cadastramento`
 
 | valor | registros | % |
 |:---|---:|---:|
-| Internet | 3.809.758 | 96,9% |
-| (nulo) | 122.143 | 3,1% |
+| Internet | 3.406.059 | 98,1% |
+| (nulo) | 67.687 | 1,9% |
 | Prisma | 3 | 0,0% |
 
 ### `leiaute`
 
 | valor | registros | % |
 |:---|---:|---:|
-| v27 | 1.456.506 | 37,0% |
-| v24_sem_descricao | 1.326.202 | 33,7% |
-| v25_antigo | 865.999 | 22,0% |
-| v24_truncado | 283.197 | 7,2% |
+| v27 | 1.324.813 | 38,1% |
+| v24_sem_descricao | 1.000.371 | 28,8% |
+| v25_antigo | 865.434 | 24,9% |
+| v24_truncado | 283.131 | 8,2% |
 
-## 5. Geografia
+## 6. Geografia
 
 A UF vem do **codigo IBGE do municipio do empregador**, nao do rotulo de texto —
 o codigo esta sempre intacto, enquanto o nome chega truncado em parte dos
@@ -161,56 +194,56 @@ arquivos.
 
 | UF | registros | % |
 |:---|---:|---:|
-| SP | 1.351.803 | 34,4% |
-| MG | 380.605 | 9,7% |
-| PR | 306.088 | 7,8% |
-| RS | 302.336 | 7,7% |
-| SC | 261.664 | 6,7% |
-| RJ | 245.310 | 6,2% |
-| (nulo) | 177.453 | 4,5% |
-| GO | 108.035 | 2,7% |
-| BA | 100.057 | 2,5% |
-| ES | 87.502 | 2,2% |
-| PE | 78.316 | 2,0% |
-| MT | 76.836 | 2,0% |
-| CE | 76.674 | 2,0% |
-| MS | 60.370 | 1,5% |
-| PA | 55.397 | 1,4% |
-| DF | 55.224 | 1,4% |
-| AM | 40.179 | 1,0% |
-| RN | 25.613 | 0,7% |
-| MA | 25.405 | 0,6% |
-| RO | 21.646 | 0,6% |
-| AL | 21.609 | 0,5% |
-| PB | 20.771 | 0,5% |
-| SE | 13.972 | 0,4% |
-| TO | 12.712 | 0,3% |
-| PI | 12.475 | 0,3% |
-| RR | 5.070 | 0,1% |
-| AC | 4.748 | 0,1% |
-| AP | 4.034 | 0,1% |
+| SP | 1.210.167 | 34,8% |
+| MG | 340.962 | 9,8% |
+| PR | 274.651 | 7,9% |
+| RS | 272.447 | 7,8% |
+| SC | 233.576 | 6,7% |
+| RJ | 219.762 | 6,3% |
+| (nulo) | 110.788 | 3,2% |
+| GO | 97.161 | 2,8% |
+| BA | 89.109 | 2,6% |
+| ES | 78.516 | 2,3% |
+| PE | 69.661 | 2,0% |
+| MT | 69.491 | 2,0% |
+| CE | 68.285 | 2,0% |
+| MS | 54.295 | 1,6% |
+| PA | 49.735 | 1,4% |
+| DF | 49.195 | 1,4% |
+| AM | 35.576 | 1,0% |
+| RN | 22.936 | 0,7% |
+| MA | 22.633 | 0,7% |
+| RO | 19.470 | 0,6% |
+| AL | 19.354 | 0,6% |
+| PB | 18.511 | 0,5% |
+| SE | 12.625 | 0,4% |
+| TO | 11.412 | 0,3% |
+| PI | 11.077 | 0,3% |
+| RR | 4.576 | 0,1% |
+| AC | 4.225 | 0,1% |
+| AP | 3.553 | 0,1% |
 
-## 6. Consistencia
+## 7. Consistencia
+
+Sobre os registros unicos.
 
 | verificacao | registros | % |
 |:---|---:|---:|
 | acidente sem data | 8 | 0,00% |
 | acidente com data no futuro | 0 | 0,00% |
-| nascimento sem data | 5.951 | 0,15% |
+| nascimento sem data | 5.709 | 0,16% |
 | nascimento posterior ao acidente | 0 | 0,00% |
 | idade fora de 14-100 anos | 23 | 0,00% |
 | CAT emitida antes do acidente | 79 | 0,00% |
-| municipio sem codigo IBGE valido | 177.453 | 4,51% |
+| municipio sem codigo IBGE valido | 110.788 | 3,19% |
 
-**Duplicatas:** 458.155 linhas identicas (11,65%),
-comparando todas as colunas de conteudo. Os registros nao tem identificador,
-entao nao da para distinguir o mesmo acidente contado duas vezes de dois
-acidentes iguais no mesmo dia — decida explicitamente antes de contar.
+`municipio sem codigo IBGE valido` sao as linhas cujo municipio veio como
+sentinela (`Zerado` ou nao classificado) — sem municipio nao ha UF derivavel.
 
-## 7. Idade no momento do acidente
+## 8. Idade no momento do acidente
 
 Calculada de `data_acidente - data_nascimento`, descartando o que cai fora de
-14 a 100 anos. Disponivel para 3.925.922 registros (99,8%).
+14 a 100 anos. Disponivel para 3.468.009 registros (99,8%).
 
 | medida | anos |
 |:---|---:|
@@ -221,7 +254,7 @@ Calculada de `data_acidente - data_nascimento`, descartando o que cai fora de
 | p75 | 44,0 |
 | p95 | 57,0 |
 | maximo | 100,0 |
-| media | 36,0 |
+| media | 35,9 |
 
 ---
 

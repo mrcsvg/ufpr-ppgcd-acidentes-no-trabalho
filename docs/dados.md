@@ -150,7 +150,8 @@ python -m acidentes_trabalho.pipeline
 from acidentes_trabalho import pipeline
 from acidentes_trabalho.dados import limpeza
 
-df = pipeline.carregar(colunas=["data_acidente", "sexo", "uf_empregador_sigla"])
+df = pipeline.carregar(colunas=["data_acidente", "sexo", "uf_empregador_sigla"],
+                       unicos=True)
 df = limpeza.descartar_colunas_nao_confiaveis(df)
 ```
 
@@ -179,6 +180,7 @@ variáveis calculadas.
 | Colunas com rótulo que não bate com o conteúdo são descartadas | Ex.: coluna 19 do `v24_sem_descricao`, rotulada `Data Acidente`, repete a competência | `dados.esquemas` (posições `None`) |
 | Idade fora de 14–100 anos vira nulo | Incompatível com vínculo formal; indica data de nascimento errada | `dados.derivadas.idade` |
 | `uf_acidente` é **mantida** na base consolidada | A base é o registro fiel do acervo; o descarte é decisão de análise | `pipeline.normalizar_um` |
+| Republicações são **marcadas**, não removidas | Os arquivos se sobrepõem (11,7%); apagar impediria auditar a decisão | `pipeline.consolidar` → coluna `duplicata` |
 
 Registre aqui toda decisão nova que altere o conjunto de linhas ou o significado
 de uma coluna, com a justificativa e onde foi implementada.

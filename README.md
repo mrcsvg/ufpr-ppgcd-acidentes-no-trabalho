@@ -66,9 +66,14 @@ python -m acidentes_trabalho.pipeline normalizar   # só uma etapa
 python -m acidentes_trabalho.pipeline --refazer    # ignora o que já está pronto
 ```
 
-A base consolidada tem **3.931.904 registros** de acidentes entre 2019 e 2026,
-em 94 MB de Parquet (contra 1,8 GB de CSV). A consolidação grava em fluxo, um
-arquivo por vez, então roda em máquina modesta.
+A base consolidada tem **3.473.749 registros únicos** de acidentes entre 2019 e
+2026, em 94 MB de Parquet (contra 1,8 GB de CSV). A consolidação grava em fluxo,
+um arquivo por vez, então roda em máquina modesta.
+
+> **Os arquivos do acervo se sobrepõem.** 11,7% das linhas são republicação do
+> mesmo registro em outra competência — 8 arquivos não trazem nada novo. A coluna
+> `duplicata` marca as repetições sem apagá-las: **use `unicos=True` para contar
+> acidentes**, senão o resultado vem inflado.
 
 > `--refazer` é necessário depois de alterar `esquemas`, `limpeza` ou
 > `derivadas`: o pipeline compara datas de arquivo, e mudança de código não
@@ -117,8 +122,8 @@ io.salvar_parquet(df, "cat.parquet")     # grava em data/processed/
 from acidentes_trabalho import pipeline
 from acidentes_trabalho.dados import limpeza
 
-df = pipeline.carregar()                        # base inteira
-df = pipeline.carregar(colunas=["sexo", "ano_acidente", "uf_empregador_sigla"])
+df = pipeline.carregar(unicos=True)             # sem as republicações
+df = pipeline.carregar(colunas=["sexo", "ano_acidente"], unicos=True)
 df = limpeza.descartar_colunas_nao_confiaveis(df)   # remove uf_acidente
 ```
 

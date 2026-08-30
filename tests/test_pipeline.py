@@ -183,3 +183,66 @@ def test_cli_consolidar_imprime_o_caminho(projeto, capsys):
     saida = capsys.readouterr().out
     assert "cat.parquet" in saida
     assert str(processed) in saida, "a etapa deve gravar na pasta do teste, nao na do projeto"
+
+
+def test_marca_republicacao_entre_arquivos(projeto):
+    """Os arquivos do acervo se sobrepoem: o mesmo registro sai em varias competencias."""
+    raw, _, processed = projeto
+    escrever(raw, "v27", nome="202207.csv", linhas=3)
+    escrever(raw, "v27", nome="202208.csv", linhas=3)  # republicacao integral
+    pipeline.normalizar()
+
+    df = pd.read_parquet(pipeline.consolidar(processed / "cat.parquet"))
+
+    assert len(df) == 6
+    primeiro = df.loc[df["arquivo"] == "202207.csv", "duplicata"]
+    assert primeiro.sum() == 2, "das 3 linhas iguais do 1o arquivo, so a primeira escapa"
+    assert df.loc[df["arquivo"] == "202208.csv", "duplicata"].all(), "arquivo inteiro republicado"
+
+
+def test_linhas_diferentes_nao_viram_duplicata(projeto):
+    raw, _, processed = projeto
+    povoar(raw, ["v27", "v25_antigo"], linhas=1)
+    pipeline.normalizar()
+
+    df = pd.read_parquet(pipeline.consolidar(processed / "cat.parquet"))
+
+    assert not df["duplicata"].any()
+
+
+def test_a_primeira_ocorrencia_nunca_e_marcada(projeto):
+    raw, _, processed = projeto
+    escrever(raw, "v27", nome="a.csv", linhas=2)
+    escrever(raw, "v27", nome="b.csv", linhas=2)
+    pipeline.normalizar()
+
+    df = pd.read_parquet(pipeline.consolidar(processed / "cat.parquet"))
+
+    assert (~df["duplicata"]).sum() == 1, "as 4 linhas sao iguais: sobra uma"
+    assert not df["duplicata"].iloc[0]
+
+
+def test_carregar_com_unicos_descarta_as_republicacoes(projeto):
+    raw, _, processed = projeto
+    escrever(raw, "v27", nome="a.csv", linhas=3)
+    pipeline.normalizar()
+    destino = pipeline.consolidar(processed / "cat.parquet")
+
+    todos = pipeline.carregar(caminho=destino)
+    unicos = pipeline.carregar(caminho=destino, unicos=True)
+
+    assert len(todos) == 3
+    assert len(unicos) == 1
+
+
+def test_unicos_funciona_com_selecao_de_colunas(projeto):
+    """A coluna duplicata precisa ser lida mesmo sem ter sido pedida."""
+    raw, _, processed = projeto
+    escrever(raw, "v27", nome="a.csv", linhas=3)
+    pipeline.normalizar()
+    destino = pipeline.consolidar(processed / "cat.parquet")
+
+    df = pipeline.carregar(colunas=["sexo", "ano_acidente"], caminho=destino, unicos=True)
+
+    assert list(df.columns) == ["sexo", "ano_acidente"], "duplicata nao volta na saida"
+    assert len(df) == 1

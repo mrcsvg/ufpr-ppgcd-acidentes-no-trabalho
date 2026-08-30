@@ -23,6 +23,7 @@ import logging
 from collections.abc import Iterator
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -39,6 +40,13 @@ from acidentes_trabalho.dados import derivadas, esquemas, gcs, limpeza
 log = logging.getLogger(__name__)
 
 PREFIXO_BUCKET = "cats/"
+
+# Coluna acrescentada na consolidacao marcando as republicacoes.
+COLUNA_DUPLICATA = "duplicata"
+
+# Colunas que nao entram na comparacao de conteudo: dizem de onde a linha veio,
+# nao o que ela registra.
+COLUNAS_PROVENIENCIA = ("arquivo", "leiaute", COLUNA_DUPLICATA)
 BASE_CONSOLIDADA = DADOS_PROCESSED / "cat.parquet"
 ARQUIVO_RELATORIO = RELATORIOS / "relatorio-dados.md"
 
@@ -133,6 +141,36 @@ def _lotes(caminhos: list[Path], esquema: pa.Schema) -> Iterator[pa.Table]:
         yield tabela.select(esquema.names).cast(esquema)
 
 
+def _marcar_republicacoes(caminhos: list[Path], esquema: pa.Schema) -> list[pd.Series]:
+    """Aponta, para cada arquivo, quais linhas ja apareceram em um arquivo anterior.
+
+    Os arquivos do acervo sao **janelas sobrepostas de mes de emissao**, nao
+    particoes disjuntas: a competencia 202208 cobre emissoes de agosto a novembro
+    de 2022, e a 202207 ja cobria julho a novembro — o arquivo inteiro e
+    republicacao. Empilhar tudo superconta os registros repetidos.
+
+    A deteccao usa hash de 64 bits do conteudo da linha, para nao precisar da base
+    inteira em memoria: guarda-se um inteiro por linha em vez do registro todo. Em
+    3,9 milhoes de linhas a chance de duas diferentes colidirem e da ordem de
+    1 em 2 milhoes, aceitavel para marcar (nao apagar) uma linha.
+    """
+    conteudo = [c for c in esquema.names if c not in COLUNAS_PROVENIENCIA]
+    hashes, tamanhos = [], []
+    for tabela in _lotes(caminhos, esquema):
+        df = tabela.select(conteudo).to_pandas()
+        hashes.append(pd.util.hash_pandas_object(df, index=False).to_numpy())
+        tamanhos.append(len(df))
+
+    juntos = pd.Series(np.concatenate(hashes)) if hashes else pd.Series(dtype="uint64")
+    repetida = juntos.duplicated(keep="first")
+
+    marcas, inicio = [], 0
+    for tamanho in tamanhos:
+        marcas.append(repetida.iloc[inicio : inicio + tamanho].reset_index(drop=True))
+        inicio += tamanho
+    return marcas
+
+
 def consolidar(destino: Path | None = None) -> Path:
     """Etapa 3: empilha os Parquet intermediarios em uma base unica.
 
@@ -151,21 +189,52 @@ def consolidar(destino: Path | None = None) -> Path:
 
     destino.parent.mkdir(parents=True, exist_ok=True)
     esquema = _esquema_unificado(caminhos)
-    total = 0
-    with pq.ParquetWriter(destino, esquema, compression="zstd") as escritor:
-        for tabela in _lotes(caminhos, esquema):
+    marcas = _marcar_republicacoes(caminhos, esquema)
+    esquema_saida = esquema.append(pa.field(COLUNA_DUPLICATA, pa.bool_()))
+
+    total = duplicadas = 0
+    with pq.ParquetWriter(destino, esquema_saida, compression="zstd") as escritor:
+        for tabela, marca in zip(_lotes(caminhos, esquema), marcas, strict=True):
+            tabela = tabela.append_column(
+                COLUNA_DUPLICATA, pa.array(marca.to_numpy(), type=pa.bool_())
+            )
             escritor.write_table(tabela)
             total += tabela.num_rows
-    log.info("consolidar: %d registros em %s", total, destino)
+            duplicadas += int(marca.sum())
+    log.info(
+        "consolidar: %d registros em %s (%d republicacoes marcadas, %.1f%%)",
+        total, destino, duplicadas, 100 * duplicadas / total if total else 0,
+    )
     return destino
 
 
-def carregar(colunas: list[str] | None = None, caminho: Path | None = None) -> pd.DataFrame:
-    """Le a base consolidada; ``colunas`` limita a leitura ao necessario."""
+def carregar(
+    colunas: list[str] | None = None,
+    caminho: Path | None = None,
+    *,
+    unicos: bool = False,
+) -> pd.DataFrame:
+    """Le a base consolidada; ``colunas`` limita a leitura ao necessario.
+
+    Args:
+        unicos: se ``True``, descarta as republicacoes marcadas em
+            ``duplicata`` — o que quase sempre e o que se quer ao **contar**
+            acidentes, ja que os arquivos do acervo se sobrepoem.
+    """
     caminho = caminho or BASE_CONSOLIDADA
     if not caminho.exists():
         raise FileNotFoundError(f"{caminho} nao existe: rode o pipeline antes")
-    return pq.read_table(caminho, columns=colunas).to_pandas()
+
+    pedidas = colunas
+    if unicos and colunas is not None and COLUNA_DUPLICATA not in colunas:
+        pedidas = [*colunas, COLUNA_DUPLICATA]
+
+    df = pq.read_table(caminho, columns=pedidas).to_pandas()
+    if unicos:
+        df = df[~df[COLUNA_DUPLICATA]].reset_index(drop=True)
+        if colunas is not None:
+            df = df[colunas]
+    return df
 
 
 def executar(bucket: str | None = None, refazer: bool = False) -> Path:

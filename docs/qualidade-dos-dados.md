@@ -12,6 +12,7 @@ pipeline; aqui ficam as **armadilhas estruturais**, que não mudam a cada rodada
 
 | Achado | Gravidade | Efeito |
 |---|---|---|
+| Arquivos se sobrepõem: 11,7% são republicação | **Alta** | Empilhar superconta os acidentes |
 | `uf_acidente` corrompida e irrecuperável | **Alta** | Não dá para localizar o acidente |
 | 5 cabeçalhos diferentes, com rótulos que mentem | **Alta** | Empilhar por nome de coluna corrompe os dados |
 | Data no formato `DD/MM/AAAA`, não `AAAAMMDD` | **Alta** | Contradiz o dicionário oficial |
@@ -20,7 +21,34 @@ pipeline; aqui ficam as **armadilhas estruturais**, que não mudam a cada rodada
 | Competência ≠ mês do acidente | Média | Série temporal por arquivo fica errada |
 | `data_despacho_beneficio` 100% nula | Baixa | Coluna inútil |
 
-## 1. `uf_acidente` está corrompida na origem
+## 1. Os arquivos se sobrepõem
+
+Cada arquivo cobre uma janela de **mês de emissão** da CAT, e as janelas **não são
+disjuntas**. A competência `202207` cobre emissões de julho a novembro de 2022; a
+`202208` cobre agosto a novembro — inteiramente contida na anterior.
+
+Consequência direta: **empilhar os 61 arquivos conta o mesmo acidente mais de uma
+vez**. São 458.155 linhas repetidas em 3.931.904 (11,7%), restando 3.473.749
+registros únicos. Oito arquivos não trazem um único registro novo:
+
+```
+202208 (123.442) · 202204 (89.602) · 202508 (72.885) · 202209 (70.245)
+202405 (57.990) · 202210 (26.023) · 202211 (5.112) · 202511 (205)
+```
+
+Outros 34 têm sobreposição parcial. Note que 99,7% dos grupos de linhas repetidas
+cruzam arquivos — repetição dentro de um mesmo arquivo é rara.
+
+A consolidação marca a repetição na coluna `duplicata` em vez de apagar a linha,
+para que a base siga sendo o registro fiel do acervo. Para **contar** acidentes,
+use `pipeline.carregar(unicos=True)`.
+
+Como os registros não têm identificador, a comparação é pelo conteúdo integral da
+linha: duas CATs realmente distintas, mas idênticas em todos os campos — mesmo
+dia, município, CBO, CID, sexo, data de nascimento e CNPJ — seriam contadas como
+uma só. O risco é baixo, e é o preço de não ter chave.
+
+## 2. `uf_acidente` está corrompida na origem
 
 O achado mais sério. A coluna é inutilizável, por dois motivos somados.
 
@@ -62,7 +90,7 @@ município, lembrando que localiza **o empregador, não o acidente**.
 `uf_acidente` fica na base consolidada apenas para que este diagnóstico possa ser
 conferido; `limpeza.descartar_colunas_nao_confiaveis` a remove na análise.
 
-## 2. Cinco cabeçalhos, quatro leiautes — e rótulos que mentem
+## 3. Cinco cabeçalhos, quatro leiautes — e rótulos que mentem
 
 | Leiaute | Colunas | Arquivos | Período | O que falta |
 |---|---:|---:|---|---|
@@ -83,7 +111,7 @@ conteúdos diferentes sem gerar erro nenhum.
 Por isso `dados.esquemas` mapeia **por posição**, ancorado no cabeçalho
 reconhecido, e recusa cabeçalho desconhecido em vez de adivinhar.
 
-## 3. Formato de data: o dicionário oficial está errado
+## 4. Formato de data: o dicionário oficial está errado
 
 O dicionário de 10/02/2021 declara `AAAAMMDD`. **Nenhum arquivo usa esse formato.**
 O que existe:
@@ -93,7 +121,7 @@ O que existe:
 
 Os dois convivem no mesmo arquivo. Conversão correta em `dados.datas`.
 
-## 4. Encoding misto
+## 5. Encoding misto
 
 Três arquivos (`cat-comp10-11-12-2020`, `cat-competencia-04-05-06-2020`,
 `cat-competencia-07-08-09-2020`) são UTF-8; os outros 58, latin-1. Como latin-1
@@ -101,7 +129,7 @@ decodifica qualquer byte sem erro, ler um UTF-8 como latin-1 **não falha** — 
 entrega `EspÃ©cie` no lugar de `Espécie`. `dados.esquemas.detectar_encoding` testa
 UTF-8 estrito antes de aceitar latin-1.
 
-## 5. Descrições truncadas
+## 6. Descrições truncadas
 
 Os campos vêm com largura fixa, preenchidos com espaço, e cortados:
 
@@ -117,7 +145,7 @@ Os campos vêm com largura fixa, preenchidos com espaço, e cortados:
 (`cid10_codigo`, `cbo_codigo`) e cruze com uma tabela externa em `data/external/`;
 as descrições servem só para conferência visual.
 
-## 6. Competência não é o mês do acidente
+## 7. Competência não é o mês do acidente
 
 Os arquivos são agrupados pela competência de processamento da CAT, não pela data
 do acidente. `cat-comp01-02-03-2020.csv` (1º trimestre de 2020) contém acidentes
@@ -128,7 +156,7 @@ Isso também significa que os meses mais recentes estão **incompletos**: aciden
 de 2026 ainda serão registrados em competências futuras. Os arquivos `202511` e
 `202512` têm 0,1 MB (≈200 registros) contra 20–30 MB dos meses normais.
 
-## 7. Preenchimento das colunas
+## 8. Preenchimento das colunas
 
 Percentual de nulos na amostra de 6 arquivos:
 
@@ -145,7 +173,7 @@ Percentual de nulos na amostra de 6 arquivos:
 Boa parte é estrutural (a coluna não existe naquele leiaute), não falta de
 preenchimento — por isso a proporção depende de quais arquivos entram na análise.
 
-## 8. Domínios observados
+## 9. Domínios observados
 
 - `sexo`: Feminino (34,9%), Masculino (64,7%), Não Informado, **Indeterminado** —
   as 4 categorias do dicionário; as duas últimas não são a mesma coisa.
@@ -168,20 +196,16 @@ Como **nenhum valor legítimo da base começa com chave** (verificado nos 3.931.
 registros), `limpeza` trata qualquer valor iniciado por `{` como ausência. Vale
 também para `Zerado`, que aparece nas colunas de UF.
 
-## 9. Duplicatas
-
-153 linhas idênticas em 222.431 (0,1%), considerando todas as colunas de conteúdo.
-Como os registros não têm identificador, não dá para saber se são o mesmo acidente
-contado duas vezes ou dois acidentes iguais no mesmo dia. Volume baixo, mas
-decida explicitamente antes de contar.
-
 ## Como reproduzir
 
-```python
-import pandas as pd
-from acidentes_trabalho.config import DADOS_RAW
-from acidentes_trabalho.dados import esquemas, limpeza
+```bash
+python -m acidentes_trabalho.pipeline
+```
 
-df = pd.concat([esquemas.ler(c) for c in DADOS_RAW.glob("*.csv")], ignore_index=True)
-df = limpeza.limpar(df)
+```python
+from acidentes_trabalho import pipeline
+from acidentes_trabalho.dados import limpeza
+
+df = pipeline.carregar(unicos=True)                 # sem as republicações
+df = limpeza.descartar_colunas_nao_confiaveis(df)   # sem uf_acidente
 ```
