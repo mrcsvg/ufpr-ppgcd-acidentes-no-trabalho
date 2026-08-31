@@ -1,4 +1,4 @@
-.PHONY: setup dados relatorio figuras atividade3 test lint fmt notebook limpar
+.PHONY: setup dados relatorio figuras atividade3 apresentacao test lint fmt notebook limpar
 
 VENV := .venv
 PY := $(VENV)/bin/python
@@ -16,6 +16,11 @@ relatorio:
 
 figuras:
 	$(PY) -m acidentes_trabalho.figuras
+
+apresentacao:
+	$(PY) reports/apresentacao/figuras_slides.py
+	node reports/apresentacao/gerar_deck.js
+	$(PY) reports/apresentacao/auditar_deck.py
 
 atividade3: figuras
 	$(PY) -m pip install -q python-docx

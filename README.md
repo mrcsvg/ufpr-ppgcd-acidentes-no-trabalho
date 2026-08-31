@@ -30,6 +30,7 @@ Se o badge não abrir (a branch tem barra no nome), use no Colab
 | [`reports/relatorio-dados.md`](reports/relatorio-dados.md) | Perfil descritivo da base, regerado pelo pipeline |
 | [`docs/qualidade-dos-dados.md`](docs/qualidade-dos-dados.md) | As armadilhas estruturais dos dados — **leia antes de analisar** |
 | `reports/ATIVIDADE_3_preenchida.docx` | Relatório da Atividade 3 (EDA no ciclo ERP), reproduzível com `make atividade3` |
+| `reports/apresentacao/apresentacao-cat.pptx` | Apresentação de 7 min com notas do apresentador (`make apresentacao`) |
 | `reports/figuras/*.png` | Figuras da análise, geradas por `make figuras` |
 | [`notebooks/01_consolidacao_e_eda.ipynb`](notebooks/01_consolidacao_e_eda.ipynb) | Notebook do Colab: consolidação explicada passo a passo + EDA |
 

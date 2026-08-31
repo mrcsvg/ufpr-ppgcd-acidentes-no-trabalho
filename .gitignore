@@ -29,6 +29,9 @@ data/external/*
 referencias/*
 !referencias/.gitkeep
 
+# ---- Node (pptxgenjs, usado só para montar a apresentação) ----
+node_modules/
+
 # ---- Python ----
 __pycache__/
 *.py[cod]
