@@ -100,7 +100,7 @@ function selo(slide, numero, { x, y }) {
   s.addNotes(
     "Trabalhamos com os microdados de CAT: toda comunicação de acidente de trabalho " +
     "registrada na Previdência. Em sete minutos vamos percorrer o workflow que " +
-    "construímos, as decisões que tomamos e o que os dados revelaram."
+    "construímos, as sete armadilhas que encontramos nos dados e o que eles revelaram."
   );
 }
 
@@ -206,7 +206,66 @@ function selo(slide, numero, { x, y }) {
   );
 }
 
-/* ------------------------------------------------- 5. REFINE — decisão 1 */
+/* ------------------------------------------------ 5. As sete armadilhas */
+{
+  const s = pres.addSlide();
+  titulo(s, "As 7 armadilhas que encontramos");
+
+  // Ordenadas por gravidade. As duas primeiras ganham slide proprio a seguir.
+  const armadilhas = [
+    ["Os arquivos se sobrepõem", "11,7% das linhas são republicação", true],
+    ["A UF do acidente está trocada", "rótulos errados; 12 UFs sem rótulo algum", true],
+    ["Rótulos de coluna que mentem", "“Data Acidente” trazendo outro conteúdo", false],
+    ["O dicionário erra a data", "é DD/MM/AAAA, não o AAAAMMDD publicado", false],
+    ["Encoding misto", "3 arquivos UTF-8 entre 58 em latin-1", false],
+    ["Descrições truncadas", "20 caracteres partem 84,7% dos CNAE em dois", false],
+    ["Competência ≠ mês do acidente", "a série temporal por arquivo fica errada", false],
+  ];
+
+  armadilhas.forEach(([nome, efeito, destaque], i) => {
+    const coluna = i < 4 ? 0 : 1;
+    const linha = i < 4 ? i : i - 4;
+    const x = L + coluna * 4.65;
+    const y = 1.28 + linha * 0.82;
+    const cor = destaque ? AMBAR : AZUL;
+
+    s.addShape(pres.ShapeType.ellipse, {
+      x, y: y + 0.02, w: 0.32, h: 0.32, fill: { color: cor }, line: { color: cor },
+    });
+    s.addText(String(i + 1), {
+      x, y: y + 0.02, w: 0.32, h: 0.32,
+      fontFace: SANS, fontSize: 14, bold: true, color: BRANCO,
+      align: "center", valign: "middle", isTextBox: true, margin: 0,
+    });
+    s.addText(nome, {
+      x: x + 0.46, y, w: 3.9, h: 0.3,
+      fontFace: SANS, fontSize: 13, bold: true, color: TINTA,
+      isTextBox: true, margin: 0,
+    });
+    s.addText(efeito, {
+      x: x + 0.46, y: y + 0.29, w: 3.9, h: 0.44,
+      fontFace: SANS, fontSize: 11.5, color: MUDO, isTextBox: true, margin: 0,
+    });
+  });
+
+  s.addText(
+    "Nenhuma delas dá erro de execução. Todas dão resultado errado em silêncio — " +
+    "por isso a etapa de exploração levou mais tempo que a análise.",
+    {
+      x: L, y: 4.68, w: LARG, h: 0.6,
+      fontFace: SANS, fontSize: 13, italic: true, color: AMBAR,
+      isTextBox: true, margin: 0,
+    }
+  );
+  s.addNotes(
+    "Encontramos sete armadilhas. Elas têm uma coisa em comum, e é o que mais nos " +
+    "marcou: nenhuma delas quebra o código. Todas produzem resultado errado em " +
+    "silêncio. Por isso a exploração tomou mais tempo que a análise em si. Vou " +
+    "detalhar as duas mais graves, em âmbar."
+  );
+}
+
+/* ------------------------------------------------- 6. REFINE — decisão 1 */
 {
   const s = pres.addSlide();
   titulo(s, "REFINE — a coluna que mentia");
@@ -227,7 +286,7 @@ function selo(slide, numero, { x, y }) {
   );
 }
 
-/* ------------------------------------------------- 6. REFINE — decisão 2 */
+/* ------------------------------------------------- 7. REFINE — decisão 2 */
 {
   const s = pres.addSlide();
   titulo(s, "REFINE — os arquivos que se repetiam");
@@ -264,7 +323,7 @@ function selo(slide, numero, { x, y }) {
   );
 }
 
-/* --------------------------------------------------------- 7. PRODUCE */
+/* --------------------------------------------------------- 8. PRODUCE */
 {
   const s = pres.addSlide();
   titulo(s, "PRODUCE — o que foi produzido");
@@ -302,7 +361,7 @@ function selo(slide, numero, { x, y }) {
   );
 }
 
-/* ------------------------------------------------ 8. Ferramentas por etapa */
+/* ------------------------------------------------ 9. Ferramentas por etapa */
 {
   const s = pres.addSlide();
   titulo(s, "Ferramentas em cada etapa");
@@ -354,7 +413,7 @@ function selo(slide, numero, { x, y }) {
   );
 }
 
-/* ------------------------------------------------ 9. Principais resultados */
+/* ----------------------------------------------- 10. Principais resultados */
 {
   const s = pres.addSlide();
   titulo(s, "Principais resultados: trajeto mata mais");
@@ -376,7 +435,7 @@ function selo(slide, numero, { x, y }) {
   );
 }
 
-/* ------------------------------------------ 10. Como a EDA ajuda o artigo */
+/* ------------------------------------------ 11. Como a EDA ajuda o artigo */
 {
   const s = pres.addSlide();
   s.background = { color: CARVAO };
