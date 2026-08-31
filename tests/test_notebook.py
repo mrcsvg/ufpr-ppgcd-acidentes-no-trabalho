@@ -62,5 +62,22 @@ def test_notebook_instala_o_pacote_antes_de_importar(notebook):
     codigo = [c for c in notebook["cells"] if c["cell_type"] == "code"]
     primeira = "".join(codigo[0]["source"])
 
-    assert "pip install" in primeira
-    assert "git clone" in primeira
+    assert "clone" in primeira, "a célula precisa trazer o repositório"
+    assert '"pip", "install"' in primeira, "e instalar o pacote"
+    # sys.executable -m pip, e nao "!pip": no Colab o shell pode apontar para
+    # outro interpretador, instalar nele, e o import falhar em seguida com
+    # ModuleNotFoundError.
+    assert "sys.executable" in primeira
+    # Rede de seguranca para o caso de o editable nao ser visto pelo kernel.
+    assert 'RAIZ / "src"' in primeira
+    assert "invalidate_caches" in primeira
+
+
+def test_setup_verifica_que_o_import_funcionou(notebook):
+    """A celula precisa falhar alto, nao seguir e quebrar tres celulas depois."""
+    primeira = "".join(
+        [c for c in notebook["cells"] if c["cell_type"] == "code"][0]["source"]
+    )
+
+    assert "check=True" in primeira, "erro de instalação tem que interromper"
+    assert "import acidentes_trabalho" in primeira, "confirma o import na própria célula"
